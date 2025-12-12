@@ -1,0 +1,64 @@
+# Task: Compare Index Orders Using EXPLAIN ANALYZE
+
+## Objective
+
+Compare the performance of two index definitions in PostgreSQL:
+
+1. `(tenant_id, created_at)`
+2. `(created_at, tenant_id)`
+
+When running a query of the form:
+
+```sql
+SELECT *
+FROM your_table
+WHERE tenant_id = :tenant
+  AND created_at > :X
+ORDER BY created_at DESC
+LIMIT 20;
+```
+
+## Steps
+
+### 1. Create Both Indexes
+
+```sql
+CREATE INDEX idx_tenant_created ON your_table (tenant_id, created_at DESC);
+CREATE INDEX idx_created_tenant ON your_table (created_at DESC, tenant_id);
+```
+
+### 2. Run EXPLAIN ANALYZE for Each Index
+
+Use the following command twice—once with each index enabled (disable the other with `ALTER INDEX ... SET (invalid = true)` or drop/recreate).
+
+```sql
+EXPLAIN ANALYZE
+SELECT *
+FROM your_table
+WHERE tenant_id = :tenant
+  AND created_at > :X
+ORDER BY created_at DESC
+LIMIT 20;
+```
+
+### 3. Measure
+
+* Index usage (check `Index Scan using ...`)
+* Rows removed by filter
+* Execution time
+* Buffers read
+* Planning time
+
+### 4. Expected Results
+
+* `(tenant_id, created_at)` typically performs best because the filter begins with tenant_id and the range filter/ordering aligns with created_at.
+* `(created_at, tenant_id)` is suboptimal because PostgreSQL cannot efficiently filter by tenant_id after scanning by created_at.
+
+### 5. Document Findings
+
+Record:
+
+* Query plan
+* Index used
+* Total execution time
+* Reason for differences
